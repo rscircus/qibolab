@@ -45,6 +45,11 @@ class Qubit:
     mean_gnd_states: complex = 0 + 0.0j
     mean_exc_states: complex = 0 + 0.0j
     resonator_polycoef_flux: List[float] = field(default_factory=list)
+    #parameters for flux fitting
+    Ec: int = 0
+    Ej: int = 0
+    g:  int = 0
+    anharmonicity: int = 0
 
     # filters used for applying CZ gate
     filter: dict = field(default_factory=dict)
