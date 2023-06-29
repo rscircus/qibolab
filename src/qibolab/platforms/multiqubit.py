@@ -49,25 +49,50 @@ class MultiqubitPlatform(Platform):
     """
 
     def __init__(self, name, runcard):
-        """Initialises the platform with its name and a platform runcard."""
-        self.instruments: dict = {}
+        # """Initialises the platform with its name and a platform runcard."""
+        # self.instruments: dict = {}
         self.channels: ChannelMap = None
 
-        self.ro_channel = {}
-        self.qd_channel = {}
-        self.qf_channel = {}
-        self.qb_channel = {}
-        self.qrm = {}
-        self.qdm = {}
-        self.qfm = {}
-        self.qbm = {}
-        self.ro_port = {}
-        self.qd_port = {}
-        self.qf_port = {}
-        self.qb_port = {}
+        # self.ro_channel = {}
+        # self.qd_channel = {}
+        # self.qf_channel = {}
+        # self.qb_channel = {}
+        # self.qrm = {}
+        # self.qdm = {}
+        # self.qfm = {}
+        # self.qbm = {}
+        # self.ro_port = {}
+        # self.qd_port = {}
+        # self.qf_port = {}
+        # self.qb_port = {}
+
+        # super().__init__(name, runcard, [], ChannelMap())
+        # signal.signal(signal.SIGTERM, self._termination_handler)
+        # self.qubit_instrument_map: dict = {}
+
+        # # Instantiate instruments
+        # for name in self.settings["instruments"]:
+        #     lib = self.settings["instruments"][name]["lib"]
+        #     i_class = self.settings["instruments"][name]["class"]
+        #     address = self.settings["instruments"][name]["address"]
+        #     from importlib import import_module
+
+        #     InstrumentClass = getattr(import_module(f"qibolab.instruments.{lib}"), i_class)
+        #     instance = InstrumentClass(name, address)
+            
+        #     print(name)
+        #     print(instance)
+
+        #     self.instruments[name] = instance
+        #     # DEBUG: debug folder = report folder
+        #     if lib == "qblox":
+        #         folder = os.path.dirname(runcard) + "/debug/"
+        #         if not os.path.exists(folder):
+        #             os.makedirs(folder)
+        #         self.instruments[name]._debug_folder = folder
 
         super().__init__(name, runcard, [], ChannelMap())
-        signal.signal(signal.SIGTERM, self._termination_handler)
+        self.instruments = {}
         self.qubit_instrument_map: dict = {}
 
         # Instantiate instruments
@@ -80,12 +105,6 @@ class MultiqubitPlatform(Platform):
             InstrumentClass = getattr(import_module(f"qibolab.instruments.{lib}"), i_class)
             instance = InstrumentClass(name, address)
             self.instruments[name] = instance
-            # DEBUG: debug folder = report folder
-            if lib == "qblox":
-                folder = os.path.dirname(runcard) + "/debug/"
-                if not os.path.exists(folder):
-                    os.makedirs(folder)
-                self.instruments[name]._debug_folder = folder
 
         # Generate qubit_instrument_map from runcard
         for qubit_name in self.qubit_channel_map:
@@ -108,11 +127,41 @@ class MultiqubitPlatform(Platform):
         # Create channel objects
         self.channels = ChannelMap.from_names(*self.settings["channels"])
 
+        # super().__init__(name, runcard, [], ChannelMap())
+        # self.instruments = {}
+        # # Instantiate instruments
+        # for name in self.settings["instruments"]:
+        #     lib = self.settings["instruments"][name]["lib"]
+        #     i_class = self.settings["instruments"][name]["class"]
+        #     address = self.settings["instruments"][name]["address"]
+        #     from importlib import import_module
+
+        #     InstrumentClass = getattr(import_module(f"qibolab.instruments.{lib}"), i_class)
+        #     instance = InstrumentClass(name, address)
+        #     self.instruments[name] = instance
+
+        # # Generate qubit_instrument_map from qubit_channel_map and the instruments' channel_port_maps
+        # self.qubit_instrument_map = {}
+        # for qubit in self.qubit_channel_map:
+        #     print(qubit)
+        #     self.qubit_instrument_map[qubit] = [None, None, None, None]
+        #     for name in self.instruments:
+        #         print("buildin instrument")
+        #         if "channel_port_map" in self.settings["instruments"][name]["settings"]:
+        #             for channel in self.settings["instruments"][name]["settings"]["channel_port_map"]:
+        #                 if channel in self.qubit_channel_map[qubit]:
+        #                     self.qubit_instrument_map[qubit][self.qubit_channel_map[qubit].index(channel)] = name
+        #         if "s4g_modules" in self.settings["instruments"][name]["settings"]:
+        #             for channel in self.settings["instruments"][name]["settings"]["s4g_modules"]:
+        #                 if channel in self.qubit_channel_map[qubit]:
+        #                     self.qubit_instrument_map[qubit][self.qubit_channel_map[qubit].index(channel)] = name
+
     def reload_settings(self):
         """Reloads platform settings from runcard and sets all instruments up with them."""
         super().reload_settings()
         self.characterization = self.settings["characterization"]
         self.qubit_channel_map = self.settings["qubit_channel_map"]
+        print(self.qubit_channel_map)
         self.nshots = self.settings["settings"]["nshots"]
         self.relaxation_time = self.settings["settings"]["relaxation_time"]
 
@@ -241,13 +290,29 @@ class MultiqubitPlatform(Platform):
                 **self.settings["settings"],
                 **self.settings["instruments"][name]["settings"],
             )
+        # Generate ro_channel[qubit], qd_channel[qubit], qf_channel[qubit], qrm[qubit], qcm[qubit], lo_qrm[qubit], lo_qcm[qubit]
+        self.ro_channel = {}  # readout
+        self.qd_channel = {}  # qubit drive
+        self.qf_channel = {}  # qubit flux
+        self.qb_channel = {}  # qubit flux biassing
+        self.qrm = {}  # qubit readout module
+        self.qdm = {}  # qubit drive module
+        self.qfm = {}  # qubit flux module
+        self.qbm = {}  # qubit flux biassing module
+        self.ro_port = {}
+        self.qd_port = {}
+        self.qf_port = {}
+        self.qb_port = {}
 
         # Generate access dictionaries
         for qubit in self.qubit_channel_map:
+            
+            print(qubit)
             self.ro_channel[qubit] = self.qubit_channel_map[qubit][0]
             self.qd_channel[qubit] = self.qubit_channel_map[qubit][1]
             self.qb_channel[qubit] = self.qubit_channel_map[qubit][2]
             self.qf_channel[qubit] = self.qubit_channel_map[qubit][3]
+            print(self.qubit_instrument_map[qubit][0])
 
             if not self.qubit_instrument_map[qubit][0] is None:
                 self.qrm[qubit] = self.instruments[self.qubit_instrument_map[qubit][0]]
@@ -499,8 +564,8 @@ class MultiqubitPlatform(Platform):
         # execute the each sweeper recursively
         self._sweep_recursion(
             sequence_copy,
-            options=options,
-            *tuple(sweepers_copy),
+            options,
+            sweepers_copy,
             results=id_results,
         )
 
@@ -515,7 +580,7 @@ class MultiqubitPlatform(Platform):
         self,
         sequence,
         options: ExecutionParameters,
-        *sweepers,
+        sweepers,
         results,
     ):
         """Executes a sweep recursively.
@@ -653,8 +718,14 @@ class MultiqubitPlatform(Platform):
 
                         result = self.execute_pulse_sequence(sequence, options, sweepers)
                         for pulse in sequence.ro_pulses:
-                            results[pulse.id] += result[pulse.serial]
+                            # Dentro del bucle
+                            if results[pulse.id] is None:
+                                results[pulse.id] = result[pulse.serial]
+                            else:
+                                results[pulse.id] += result[pulse.serial]
+                            # results[pulse.id] += result[pulse.serial]
                             results[pulse.qubit] = results[pulse.id]
+                            print(results)
                     else:
                         sweepers_repetitions = 1
                         for sweeper in sweepers:
@@ -722,6 +793,7 @@ class MultiqubitPlatform(Platform):
 
     def get_lo_readout_frequency(self, qubit):
         """Gets the frequency of the local oscillator used to upconvert readout pulses for a qubit."""
+        print(f"entro: {self.ro_port}")
         qubit = qubit.name if isinstance(qubit, Qubit) else qubit
         return self.ro_port[qubit].lo_frequency
 
