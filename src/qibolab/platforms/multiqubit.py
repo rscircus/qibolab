@@ -161,7 +161,7 @@ class MultiqubitPlatform(Platform):
         super().reload_settings()
         self.characterization = self.settings["characterization"]
         self.qubit_channel_map = self.settings["qubit_channel_map"]
-        print(self.qubit_channel_map)
+        # print(self.qubit_channel_map)
         self.nshots = self.settings["settings"]["nshots"]
         self.relaxation_time = self.settings["settings"]["relaxation_time"]
 
@@ -307,12 +307,12 @@ class MultiqubitPlatform(Platform):
         # Generate access dictionaries
         for qubit in self.qubit_channel_map:
             
-            print(qubit)
+            # print(qubit)
             self.ro_channel[qubit] = self.qubit_channel_map[qubit][0]
             self.qd_channel[qubit] = self.qubit_channel_map[qubit][1]
             self.qb_channel[qubit] = self.qubit_channel_map[qubit][2]
             self.qf_channel[qubit] = self.qubit_channel_map[qubit][3]
-            print(self.qubit_instrument_map[qubit][0])
+            # print(self.qubit_instrument_map[qubit][0])
 
             if not self.qubit_instrument_map[qubit][0] is None:
                 self.qrm[qubit] = self.instruments[self.qubit_instrument_map[qubit][0]]
@@ -388,6 +388,10 @@ class MultiqubitPlatform(Platform):
         if not self.is_connected:
             raise_error(RuntimeError, "Execution failed because instruments are not connected.")
 
+
+        # if options.nshots is None:
+        #     nshots = self.nshots
+
         if options.averaging_mode == AveragingMode.SINGLESHOT:
             nshots = options.nshots if options.nshots is not None else self.nshots
             navgs = 1
@@ -397,6 +401,19 @@ class MultiqubitPlatform(Platform):
             nshots = 1
             self.average = True
 
+
+        print(f"navgs: {navgs}")
+        print(f"nshots: {nshots}")
+
+        # if options.averaging_mode == AveragingMode.SINGLESHOT:
+        #     nshots = 1
+        #     self.average = False
+            
+        # elif options.averaging_mode == AveragingMode.CYCLIC:
+        #     nshots = options.nshots
+        #     self.average = True
+
+        # relaxation_time = options.relaxation_time
         relaxation_time = options.relaxation_time if options.relaxation_time is not None else self.relaxation_time
         repetition_duration = sequence.finish + relaxation_time
 
@@ -491,25 +508,41 @@ class MultiqubitPlatform(Platform):
                         else:
                             acquisition_results[key] = value
 
+        # print(f"len aquaried data: {len(acquisition_results)}")
+        # print(f"aquaried data: {acquisition_results}")
+
         # TODO: move to QRM_RF.acquire()
         for ro_pulse in sequence.ro_pulses:
             if options.acquisition_type is AcquisitionType.DISCRIMINATION:
-                acquisition = SampleResults(acquisition_results[ro_pulse.serial][2])
+                exp_res = acquisition_results[ro_pulse.serial][2]
+                if self.average:
+                    exp_res = np.mean(exp_res, axis=0)
             else:
-                ires = acquisition_results[ro_pulse.serial][0]
-                qres = acquisition_results[ro_pulse.serial][1]
-                if options.acquisition_type is AcquisitionType.RAW:
-                    acquisition = RawWaveformResults(ires + 1j * qres)
-                if options.acquisition_type is AcquisitionType.INTEGRATION:
-                    acquisition = IntegratedResults(ires + 1j * qres)
-            if self.average:
-                acquisition = acquisition.average
-            data[ro_pulse.serial] = data[ro_pulse.serial] = acquisition
+                ires = acquisition_results[ro_pulse.serial][0][0]
+                qres = acquisition_results[ro_pulse.serial][1][0]
+                exp_res = ires + 1j * qres
+            
+            print(f"results of  {ro_pulse.serial}: {exp_res}")
+             # data[ro_pulse.serial] = data[ro_pulse.qubit] = acquisition
+            data[ro_pulse.serial] = data[ro_pulse.qubit] = options.results_type(exp_res)
 
-            # data[ro_pulse.serial] = ExecutionResults.from_components(*acquisition_results[ro_pulse.serial])
-            # data[ro_pulse.serial] = IntegratedResults(acquisition_results[ro_pulse.serial])
-            # data[ro_pulse.qubit] = copy.copy(data[ro_pulse.serial])
         return data
+
+        # data = {}
+        # for serial in acquisition_results:
+        #     for if_pulse, original in changed.items():
+        #         if serial == if_pulse.serial:
+        #             if options.acquisition_type is AcquisitionType.DISCRIMINATION:
+        #                 exp_res = acquisition_results[serial][2]
+        #                 if self.average:
+        #                     exp_res = np.mean(exp_res, axis=0)
+        #             else:
+        #                 ires = acquisition_results[serial][0][0]
+        #                 qres = acquisition_results[serial][1][0]
+        #                 exp_res = ires + 1j * qres
+
+        #             data[original] = data[if_pulse.qubit] = options.results_type(exp_res)
+        # return data
 
     def sweep(self, sequence: PulseSequence, options: ExecutionParameters, *sweepers):
         """Executes a sequence of pulses while sweeping one or more parameters.
@@ -565,7 +598,7 @@ class MultiqubitPlatform(Platform):
         self._sweep_recursion(
             sequence_copy,
             options,
-            sweepers_copy,
+            *tuple(sweepers_copy), #sweepers_copy,
             results=id_results,
         )
 
@@ -580,7 +613,7 @@ class MultiqubitPlatform(Platform):
         self,
         sequence,
         options: ExecutionParameters,
-        sweepers,
+        *sweepers,
         results,
     ):
         """Executes a sweep recursively.
@@ -725,7 +758,6 @@ class MultiqubitPlatform(Platform):
                                 results[pulse.id] += result[pulse.serial]
                             # results[pulse.id] += result[pulse.serial]
                             results[pulse.qubit] = results[pulse.id]
-                            print(results)
                     else:
                         sweepers_repetitions = 1
                         for sweeper in sweepers:
@@ -793,7 +825,7 @@ class MultiqubitPlatform(Platform):
 
     def get_lo_readout_frequency(self, qubit):
         """Gets the frequency of the local oscillator used to upconvert readout pulses for a qubit."""
-        print(f"entro: {self.ro_port}")
+        # print(f"entro: {self.ro_port}")
         qubit = qubit.name if isinstance(qubit, Qubit) else qubit
         return self.ro_port[qubit].lo_frequency
 
