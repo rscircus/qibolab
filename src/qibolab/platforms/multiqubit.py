@@ -388,22 +388,23 @@ class MultiqubitPlatform(Platform):
         if not self.is_connected:
             raise_error(RuntimeError, "Execution failed because instruments are not connected.")
 
-
-        # if options.nshots is None:
-        #     nshots = self.nshots
-
         if options.averaging_mode == AveragingMode.SINGLESHOT:
             nshots = options.nshots if options.nshots is not None else self.nshots
             navgs = 1
             self.average = False
-        else:
+
+        elif options.averaging_mode == AveragingMode.CYCLIC:
             navgs = options.nshots if options.nshots is not None else self.nshots
             nshots = 1
             self.average = True
+            
+            print(f"navgs: {navgs}")
+            print(f"nshots: {nshots}")
+
+        if options.nshots is None:
+            nshots = self.nshots
 
 
-        print(f"navgs: {navgs}")
-        print(f"nshots: {nshots}")
 
         # if options.averaging_mode == AveragingMode.SINGLESHOT:
         #     nshots = 1
