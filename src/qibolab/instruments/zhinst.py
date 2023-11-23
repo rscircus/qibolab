@@ -717,8 +717,8 @@ class Zurich(Controller):
     def play_sweep_select_single(exp, qubit, pulse, section, parameters, partial_sweep):
         """Play Zurich pulse when a single sweeper is involved"""
         if any("amplitude" in param for param in parameters):
-            pulse.zhpulse.amplitude *= max(pulse.zhsweeper.values)
-            pulse.zhsweeper.values /= max(pulse.zhsweeper.values)
+            # pulse.zhpulse.amplitude *= max(pulse.zhsweeper.values)
+            # pulse.zhsweeper.values /= max(pulse.zhsweeper.values)
             exp.play(
                 signal=f"{section}{qubit.name}",
                 pulse=pulse.zhpulse,
@@ -755,8 +755,8 @@ class Zurich(Controller):
                 if sweeper.uid == "amplitude":
                     sweeper_amp_index = pulse.zhsweepers.index(sweeper)
                     sweeper.values = sweeper.values.copy()
-                    pulse.zhpulse.amplitude *= max(abs(sweeper.values))
-                    sweeper.values /= max(abs(sweeper.values))
+                    # pulse.zhpulse.amplitude *= max(abs(sweeper.values))
+                    # sweeper.values /= max(abs(sweeper.values))
                 else:
                     sweeper_dur_index = pulse.zhsweepers.index(sweeper)
 
@@ -1163,16 +1163,17 @@ class Zurich(Controller):
                 )
         if sweeper.parameter is Parameter.amplitude:
             for pulse in sweeper.pulses:
-                pulse = pulse.copy()
-                pulse.amplitude *= max(abs(sweeper.values))
+                # pulse = pulse.copy()
+                # pulse.amplitude *= max(abs(sweeper.values))
 
                 # Proper copy(sweeper) here if we want to keep the sweepers
                 # sweeper_aux = copy.copy(sweeper)
-                aux_max = max(abs(sweeper.values))
 
-                sweeper.values /= aux_max
+                # aux_max = max(abs(sweeper.values))
+
+                # sweeper.values /= aux_max
                 parameter = ZhSweeper(pulse, sweeper, qubits[sweeper.pulses[0].qubit]).zhsweeper
-                sweeper.values *= aux_max
+                # sweeper.values *= aux_max
 
         if sweeper.parameter is Parameter.bias:
             if sweeper.qubits:
@@ -1217,16 +1218,16 @@ class Zurich(Controller):
 
         if sweeper.parameter is Parameter.amplitude:
             for pulse in sweeper.pulses:
-                pulse = pulse.copy()
-                pulse.amplitude *= max(abs(sweeper.values))
+                # pulse = pulse.copy()
+                # pulse.amplitude *= max(abs(sweeper.values))
 
-                # Proper copy(sweeper) here
-                # sweeper_aux = copy.copy(sweeper)
-                aux_max = max(abs(sweeper.values))
+                # # Proper copy(sweeper) here
+                # # sweeper_aux = copy.copy(sweeper)
+                # aux_max = max(abs(sweeper.values))
 
-                sweeper.values /= aux_max
+                # sweeper.values /= aux_max
                 zhsweeper = ZhSweeper(pulse, sweeper, qubits[sweeper.pulses[0].qubit]).zhsweeper
-                sweeper.values *= aux_max
+                # sweeper.values *= aux_max
 
                 zhsweeper.uid = "amplitude"  # f"amplitude{i}"
                 path = "DEV12146"  # Hardcoded for SHFQC(SHFQA)
