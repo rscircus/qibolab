@@ -130,15 +130,21 @@ class ClusterQCM_BB(ClusterModule):
         self._unused_sequencers_numbers: list[int] = []
 
     def _set_default_values(self):
-        # disable all sequencer connections
+        """Set default values for the configuration of the device and it's
+        sequencers.
+
+        This method initializes the device to a default state by performing the following steps:
+        1. Disconnect all sequencer connections.
+        2. Set offset to zero on all four output ports.
+        3. Initialize the parameters of the default sequencers to predefined default values.
+        4. Connect the default sequencers to the output ports in the desired default configuration.
+
+        Notes:
+        - The non-default sequencers will be connected, if needed, and initialized with the same
+        default parameters in process_pulse_sequence().
+        """
         self.device.disconnect_outputs()
-
-        # set offset to zero on all ports. Default values after reboot = 0
         [self.device.set(f"out{idx}_offset", value=0) for idx in range(4)]
-
-        # initialise the parameters of the default sequencers to the default values,
-        # the rest of the sequencers are disconnected, but will be configured
-        # with the same parameters as the default in process_pulse_sequence()
         default_sequencers = [
             self.device.sequencers[i] for i in self.DEFAULT_SEQUENCERS.values()
         ]
@@ -146,35 +152,40 @@ class ClusterQCM_BB(ClusterModule):
             for name, value in self.DEFAULT_SEQUENCERS_VALUES.items():
                 target.set(name, value)
 
-        # connect the default sequencers to the out ports
         out__port_path = {0: "I", 1: "Q", 2: "I", 3: "Q"}
         for port_num, value in out__port_path.items():
             self.device.sequencers[port_num].set(f"connect_out{port_num}", value)
-        # disconnect all other sequencers from the ports
 
     def connect(self, cluster: QbloxCluster = None):
-        """Connects to the instrument using the instrument settings in the
-        runcard.
+        """Connect the module to the controller instrument (QbloxCluster) and
+        upload cached settings to the module.
 
-        Once connected, it creates port classes with properties mapped
-        to various instrument parameters, and initialises the the
-        underlying device parameters. It uploads to the module the port
-        settings loaded from the runcard.
+        The cached settings (self.setting) are the one loaded from the runcard during the setup().
+
+        Note:
+        - settings[port][nco_freq] (int): [-500 to 500 MHz] frequency of the NCO used to modulate the IF pulse.
+        Here nco_freq = 0 (continous) signal is produced, and is used to controll the flux on the
+        qubits with a costant DC voltage to keep them at the sweetspot.
+        - settings[port][nco_phase_offs] (int): offset phase of the NCO
+        - settings[port]['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are modulated
+        to the intermediate frequency using the numerically controlled oscillator within the fpga. It only requires
+        the upload of the pulse envelope waveform. At the moment this param is not loaded but is always set to True..
+
+        Raises:
+        - ConnectionError: If the module is not connected to the specified cluster.
+        - RuntimeError: If there is an issue initializing port parameters on the module.
         """
         if self.is_connected:
             return
 
         elif cluster is not None:
             self.device = cluster.modules[int(self.address.split(":")[1]) - 1]
-            # test connection with module
             if not self.device.present():
                 raise ConnectionError(
                     f"Module {self.device.name} not connected to cluster {cluster.name}"
                 )
-            # once connected, initialise the parameters of the device to the default values
             self._device_num_sequencers = len(self.device.sequencers)
             self._set_default_values()
-            # then set the value loaded from the runcard
             try:
                 for port in self.ports:
                     self._sequencers[port] = []
@@ -188,16 +199,11 @@ class ClusterQCM_BB(ClusterModule):
             self.is_connected = True
 
     def setup(self, **settings):
-        """Cache the settings of the runcard and instantiate the ports of the
-        module.
+        """Empty method to comply with instrumet interface.
 
-        Args:
-            **settings: dict = A dictionary of settings loaded from the runcard:
-
-                - settings[oX]['offset'] (float): [-2.5 - 2.5 V] offset in volts applied to the output port.
-                - settings[oX]['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are modulated to the intermediate frequency
-                  using the numerically controlled oscillator within the fpga. It only requires the upload of the pulse envelope waveform.
-                  At the moment this param is not loaded but is always set to True.
+        Note:
+        - The port.offset param is no longer read from the runcard but is directly extracted from
+        the sweetspot of the qubit objects.
         """
         pass
 

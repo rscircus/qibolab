@@ -155,13 +155,24 @@ class ClusterQRM_RF(ClusterModule):
         self._execution_time: float = 0
 
     def _set_default_values(self):
-        # disable all sequencer connections
+        """Set default values for the configuration of the device and it's
+        sequencers.
+
+        This method initializes the device to a default state by performing the following steps:
+        1. Disconnect all sequencer connections.
+        2. Set I (path0) and Q (path1) offset to zero on output port 0.
+        3. Initialize the parameters of the input port to predefined default values.
+        4. Initialize the parameters of the default sequencers to predefined default values.
+        5. Connect the default sequencers to the output ports in the desired default configuration.
+
+        Notes:
+        - The non-default sequencers will be connected, if needed, and initialized with the same
+        default parameters in process_pulse_sequence().
+        """
         self.device.disconnect_outputs()
         self.device.disconnect_inputs()
-
-        # set I (path0) and Q (path1) offset to zero on output port 0. Default values after reboot = 7.625
         [self.device.set(f"out0_offset_path{i}", 0) for i in range(2)]
-        # set input port parameters to default
+
         self.device.set("in0_att", 0)
         self.device.set("scope_acq_avg_mode_en_path0", True)
         self.device.set("scope_acq_avg_mode_en_path1", True)
@@ -170,25 +181,45 @@ class ClusterQRM_RF(ClusterModule):
         self.device.set("scope_acq_trigger_level_path1", 0)
         self.device.set("scope_acq_trigger_mode_path0", "sequencer")
         self.device.set("scope_acq_trigger_mode_path1", "sequencer")
-        # initialise the parameters of the default sequencer to the default values,
-        # the rest of the sequencers are disconnected, but will be configured
-        # with the same parameters as the default in process_pulse_sequence()
+
         target = self.device.sequencers[self.DEFAULT_SEQUENCERS["o1"]]
         for name, value in self.DEFAULT_SEQUENCERS_VALUES.items():
             target.set(name, value)
 
-        # connect sequencer to out/in ports
         target.set("connect_out0", "IQ")
         target.set("connect_acq", "in0")
 
     def connect(self, cluster: QbloxCluster = None):
-        """Connects to the instrument using the instrument settings in the
-        runcard.
+        """Connect the module to the controller instrument (QbloxCluster) and
+        upload cached settings to the module. The cached settings
+        (self.setting) are the one loaded from the runcard during the setup().
 
-        Once connected, it creates port classes with properties mapped
-        to various instrument parameters, and initialises the the
-        underlying device parameters. It uploads to the module the port
-        settings loaded from the runcard.
+        Note:
+        - settings[out_port]['attenuation'] (int): [0 to 60 dBm, in multiples of 2] attenuation at the output.
+        - settings[out_port]['lo_frequency'] (int): [2_000_000_000 to 18_000_000_000 Hz] local oscillator frequency.
+        - settings[out_port]['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are modulated
+        to the intermediate frequency using the numerically controlled oscillator within the fpga. It only requires
+        the upload of the pulse envelope waveform. At the moment this param is not loaded but is always set to True.
+        - settings[out_port][nco_freq] (int): [-500 to 500 MHz] frequency of the NCO used to modulate the IF pulse.
+        Here nco_freq = 0  is the starting value, and for each feedback (readout) pulse this frequency will be dynamically changed
+        (on the fly) and summed (mixer) with the lo_frequency to reach the readout frequency (dressed resonator frequency).
+        - settings[out_port][nco_phase_offs] (int): offset phase of the NCO
+
+        - settings[in_port]['hardware_demod_en'] (bool): enables Hardware Demodulation. In this mode, the
+            sequencers of the fpga demodulate, integrate and classify the results for every shot. Once
+            integrated, the i and q values and the result of the classification requires much less memory,
+            so they can be stored for every shot in separate `bins` and retrieved later. Hardware Demodulation
+            also allows making multiple readouts on the same qubit at different points in the circuit, which is
+            not possible with Software Demodulation. At the moment this param is not loaded but is always set to True.
+        - settings[in_port]['acquisition_hold_off'] (int): [0 to 16834 ns, in multiples of 4] the time between the moment
+            the start of the readout pulse begins to be played, and the start of the acquisition. This is used
+            to account for the time of flight of the pulses from the output port to the input port.
+        - settings[in_port]['acquisition_duration'] (int): [0 to 8192 ns] the duration of the acquisition. It is limited by
+            the amount of memory available in the fpga to store i q samples.
+
+        Raises:
+        - ConnectionError: If the module is not connected to the specified cluster.
+        - RuntimeError: If there is an issue initializing port parameters on the module.
         """
         if self.is_connected:
             return
@@ -232,32 +263,7 @@ class ClusterQRM_RF(ClusterModule):
 
     def setup(self, **settings):
         """Cache the settings of the runcard and instantiate the ports of the
-        module.
-
-        Args:
-            **settings: dict = A dictionary of settings loaded from the runcard:
-
-                - settings['o1']['attenuation'] (int): [0 to 60 dBm, in multiples of 2] attenuation at the output.
-                - settings['o1']['lo_enabled'] (bool): enable or disable local oscillator for up-conversion.
-                - settings['o1']['lo_frequency'] (int): [2_000_000_000 to 18_000_000_000 Hz] local oscillator
-                  frequency.
-                - settings['o1']['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are
-                  modulated to the intermediate frequency using the numerically controlled oscillator within the
-                  fpga. It only requires the upload of the pulse envelope waveform.
-                  At the moment this param is not loaded but is always set to True.
-
-                - settings['i1']['hardware_demod_en'] (bool): enables Hardware Demodulation. In this mode, the
-                  sequencers of the fpga demodulate, integrate and classify the results for every shot. Once
-                  integrated, the i and q values and the result of the classification requires much less memory,
-                  so they can be stored for every shot in separate `bins` and retrieved later. Hardware Demodulation
-                  also allows making multiple readouts on the same qubit at different points in the circuit, which is
-                  not possible with Software Demodulation. At the moment this param is not loaded but is always set to True.
-                - settings['i1']['acquisition_hold_off'] (int): [0 to 16834 ns, in multiples of 4] the time between the moment
-                  the start of the readout pulse begins to be played, and the start of the acquisition. This is used
-                  to account for the time of flight of the pulses from the output port to the input port.
-                - settings['i1']['acquisition_duration'] (int): [0 to 8192 ns] the duration of the acquisition. It is limited by
-                  the amount of memory available in the fpga to store i q samples.
-        """
+        module."""
         self.settings = settings if settings else self.settings
 
     def _get_next_sequencer(self, port: str, frequency: int, qubits: dict, qubit: None):

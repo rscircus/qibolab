@@ -142,15 +142,23 @@ class ClusterQCM_RF(ClusterModule):
         self._unused_sequencers_numbers: list[int] = []
 
     def _set_default_values(self):
-        # disable all sequencer connections
+        """Set default values for the configuration of the device and it's
+        sequencers.
+
+        This method initializes the device to a default state by performing the following steps:
+        1. Disconnect all sequencer connections.
+        2. Set I (path0) and Q (path1) offset to zero on output port 0 and 1.
+        3. Initialize the parameters of the default sequencers to predefined default values.
+        4. Connect the default sequencers to the output ports in the desired default configuration.
+
+        Notes:
+        - The non-default sequencers will be connected, if needed, and initialized with the same
+        default parameters in process_pulse_sequence().
+        """
         self.device.disconnect_outputs()
-        # set I (path0) and Q (path1) offset to zero on output port 0 and 1. Default values after reboot = 7.625
         for i in range(2):
             [self.device.set(f"out{i}_offset_path{j}", 0) for j in range(2)]
 
-        # initialise the parameters of the default sequencers to the default values,
-        # the rest of the sequencers are disconnected but will be configured
-        # with the same parameters as the default in process_pulse_sequence()
         default_sequencers = [
             self.device.sequencers[i] for i in self.DEFAULT_SEQUENCERS.values()
         ]
@@ -158,35 +166,43 @@ class ClusterQCM_RF(ClusterModule):
             for name, value in self.DEFAULT_SEQUENCERS_VALUES.items():
                 target.set(name, value)
 
-        # connect the  default sequencers to the out port
         self.device.sequencers[self.DEFAULT_SEQUENCERS["o1"]].set("connect_out0", "IQ")
         self.device.sequencers[self.DEFAULT_SEQUENCERS["o1"]].set("connect_out1", "off")
         self.device.sequencers[self.DEFAULT_SEQUENCERS["o2"]].set("connect_out1", "IQ")
         self.device.sequencers[self.DEFAULT_SEQUENCERS["o2"]].set("connect_out0", "off")
 
     def connect(self, cluster: QbloxCluster = None):
-        """Connects to the instrument using the instrument settings in the
-        runcard.
+        """Connect the module to the controller instrument (QbloxCluster) and
+        upload cached settings to the module.
 
-        Once connected, it creates port classes with properties mapped
-        to various instrument parameters, and initialises the the
-        underlying device parameters. It uploads to the module the port
-        settings loaded from the runcard.
+        The cached settings (self.setting) are the one loaded from the runcard during the setup().
+
+        Note:
+        - settings[port]['attenuation'] (int): [0 to 60 dBm, in multiples of 2] attenuation at the output.
+        - settings[port]['lo_frequency'] (int): [2_000_000_000 to 18_000_000_000 Hz] local oscillator frequency.
+        - settings[port]['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are modulated
+        to the intermediate frequency using the numerically controlled oscillator within the fpga. It only requires
+        the upload of the pulse envelope waveform. At the moment this param is not loaded but is always set to True.
+        - settings[port][nco_freq] (int): [-500 to 500 MHz] frequency of the NCO used to modulate the IF pulse.
+        Here nco_freq = 0  is the starting value, and for each drive pulse this frequency will be dynamically changed
+        (on the fly) and summed (mixer) with the lo_frequency to reach the qubit frequency.
+        - settings[port][nco_phase_offs] (int): offset phase of the NCO
+
+        Raises:
+        - ConnectionError: If the module is not connected to the specified cluster.
+        - RuntimeError: If there is an issue initializing port parameters on the module.
         """
         if self.is_connected:
             return
 
         elif cluster is not None:
             self.device = cluster.modules[int(self.address.split(":")[1]) - 1]
-            # test connection with module
             if not self.device.present():
                 raise ConnectionError(
                     f"Module {self.device.name} not connected to cluster {cluster.name}"
                 )
-            # once connected, initialise the parameters of the device to the default values
             self._device_num_sequencers = len(self.device.sequencers)
             self._set_default_values()
-            # then set the value loaded from the runcard
             try:
                 for port in self.settings:
                     self._sequencers[port] = []
@@ -206,24 +222,7 @@ class ClusterQCM_RF(ClusterModule):
             self.is_connected = True
 
     def setup(self, **settings):
-        """Cache the settings of the runcard and instantiate the ports of the
-        module.
-
-        Args:
-            **settings: dict = A dictionary of settings loaded from the runcard:
-
-                - settings['o1']['attenuation'] (int): [0 to 60 dBm, in multiples of 2] attenuation at the output.
-                - settings['o1']['lo_frequency'] (int): [2_000_000_000 to 18_000_000_000 Hz] local oscillator frequency.
-                - settings['o1']['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are modulated to the intermediate frequency
-                  using the numerically controlled oscillator within the fpga. It only requires the upload of the pulse envelope waveform.
-                  At the moment this param is not loaded but is always set to True.
-
-                - settings['o2']['attenuation'] (int): [0 to 60 dBm, in multiples of 2] attenuation at the output.
-                - settings['o2']['lo_frequency'] (int): [2_000_000_000 to 18_000_000_000 Hz] local oscillator frequency.
-                - settings['o2']['hardware_mod_en'] (bool): enables Hardware Modulation. In this mode, pulses are modulated to the intermediate frequency
-                  using the numerically controlled oscillator within the fpga. It only requires the upload of the pulse envelope waveform.
-                  At the moment this param is not loaded but is always set to True.
-        """
+        """Cache the settings of the runcard in attribute self.settings."""
         self.settings = settings if settings else self.settings
 
     def _get_next_sequencer(self, port, frequency, qubit: None):
