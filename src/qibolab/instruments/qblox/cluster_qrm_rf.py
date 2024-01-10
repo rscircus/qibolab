@@ -146,7 +146,6 @@ class ClusterQRM_RF(ClusterModule):
         self._input_ports_keys = ["i1"]
         self._output_ports_keys = ["o1"]
         self._sequencers: dict[Sequencer] = {"o1": []}
-        self.channel_map: dict = {}
         self._device_num_output_ports = 1
         self._device_num_sequencers: int
         self._free_sequencers_numbers: list[int] = []

@@ -17,6 +17,7 @@ from qibolab.instruments.qblox.q1asm import (
 from qibolab.instruments.qblox.sequencer import Sequencer, WaveformsBuffer
 from qibolab.instruments.qblox.sweeper import QbloxSweeper, QbloxSweeperType
 from qibolab.pulses import Pulse, PulseSequence, PulseType
+from qibolab.qubits import Qubit
 from qibolab.sweeper import Parameter, Sweeper, SweeperType
 
 
@@ -119,7 +120,6 @@ class ClusterQCM_BB(ClusterModule):
 
         self._debug_folder: str = ""
         self._sequencers: dict[Sequencer] = {}
-        self.channel_map: dict = {}
         self._device_num_output_ports = 2
         self._device_num_sequencers: int
         self._free_sequencers_numbers: list[
@@ -198,7 +198,7 @@ class ClusterQCM_BB(ClusterModule):
         """
         pass
 
-    def _get_next_sequencer(self, port, frequency, qubits: dict):
+    def _get_next_sequencer(self, port, frequency):
         """Retrieves and configures the next avaliable sequencer.
 
         The parameters of the new sequencer are copied from those of the default sequencer, except for the
@@ -210,12 +210,11 @@ class ClusterQCM_BB(ClusterModule):
         Raises:
             Exception = If attempting to set a parameter without a connection to the instrument.
         """
-        # select the qubit with flux line, if present, connected to the specific port
-        qubit = None
-        for _qubit in qubits.values():
-            if _qubit.flux is not None and _qubit.flux.port == self.ports[port]:
-                qubit = _qubit
-
+        # check availability
+        if len(self._free_sequencers_numbers) == 0:
+            raise Exception(
+                f"The number of sequencers requried to play the sequence exceeds the number available {self._device_num_sequencers}."
+            )
         # select a new sequencer and configure it as required
         next_sequencer_number = self._free_sequencers_numbers.pop(0)
         if next_sequencer_number != self.DEFAULT_SEQUENCERS[port]:
@@ -242,7 +241,6 @@ class ClusterQCM_BB(ClusterModule):
 
         # create sequencer wrapper
         sequencer = Sequencer(next_sequencer_number)
-        sequencer.qubit = qubit.name if qubit else None
         return sequencer
 
     def get_if(self, pulse):
@@ -327,6 +325,13 @@ class ClusterQCM_BB(ClusterModule):
                 self.DEFAULT_SEQUENCERS[port]
             ] + self._free_sequencers_numbers
 
+            sequencer = self._get_next_sequencer(port=port, frequency=0)
+            self._sequencers[port].append(sequencer)
+
+            qubit = self.select_qubit(port, qubits)
+            if qubit is not None:
+                sequencer.qubit = qubit.name
+            # print(port_pulses)
             if not port_pulses.is_empty:
                 # split the collection of port pulses in non overlapping pulses
                 non_overlapping_pulses: PulseSequence
@@ -334,19 +339,9 @@ class ClusterQCM_BB(ClusterModule):
                     # TODO: for non_overlapping_same_frequency_pulses in non_overlapping_pulses.separate_different_frequency_pulses():
 
                     # each set of not overlapping pulses will be played by a separate sequencer
-                    # check sequencer availability
-                    if len(self._free_sequencers_numbers) == 0:
-                        raise Exception(
-                            f"The number of sequencers requried to play the sequence exceeds the number available {self._device_num_sequencers}."
-                        )
                     # get next sequencer
-                    sequencer = self._get_next_sequencer(
-                        port=port,
-                        frequency=self.get_if(non_overlapping_pulses[0]),
-                        qubits=qubits,
-                    )
-                    # add the sequencer to the list of sequencers required by the port
-                    self._sequencers[port].append(sequencer)
+                    frequency = self.get_if(non_overlapping_pulses[0])
+                    self.device.sequencers[sequencer.number].set("nco_freq", frequency)
 
                     # make a temporary copy of the pulses to be processed
                     pulses_to_be_processed = non_overlapping_pulses.shallow_copy()
@@ -381,12 +376,6 @@ class ClusterQCM_BB(ClusterModule):
                             )
                             # add the sequencer to the list of sequencers required by the port
                             self._sequencers[port].append(sequencer)
-            else:
-                sequencer = self._get_next_sequencer(
-                    port=port, frequency=0, qubits=qubits
-                )
-                # add the sequencer to the list of sequencers required by the port
-                self._sequencers[port].append(sequencer)
 
         # update the lists of used and unused sequencers that will be needed later on
         self._used_sequencers_numbers = []
@@ -769,3 +758,15 @@ class ClusterQCM_BB(ClusterModule):
         """Empty method to comply with Instrument interface."""
         self.is_connected = False
         self.device = None
+
+    def select_qubit(self, port: str, qubits: dict):
+        """Return the qubit that has the flux line connected to the specified
+        port.
+
+        If the qubit has no flux line connected, it will return None.
+        """
+        qubit: Qubit = None
+        for _qubit in qubits.values():
+            if _qubit.flux.port == self.ports[port]:
+                qubit = _qubit
+        return qubit

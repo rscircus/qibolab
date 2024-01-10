@@ -134,7 +134,6 @@ class ClusterQCM_RF(ClusterModule):
 
         self._debug_folder: str = ""
         self._sequencers: dict[Sequencer] = {}
-        self.channel_map: dict = {}
         self._device_num_output_ports = 2
         self._device_num_sequencers: int
         self._free_sequencers_numbers: list[int] = []

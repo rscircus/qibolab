@@ -32,6 +32,7 @@ class ClusterModule(Instrument):
     def __init__(self, name: str, address: str):
         super().__init__(name, address)
         self._ports: dict = {}
+        self.channel_map: dict = {}
 
     def ports(self, name: str, out: bool = True):
         """Adds an entry to the dictionary `self._ports` with key 'name' and
