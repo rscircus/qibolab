@@ -2,14 +2,14 @@ import itertools
 import pathlib
 
 from qibolab.channels import Channel, ChannelMap
-from qibolab.instruments.dummy import DummyInstrument
-from qibolab.instruments.oscillator import LocalOscillator
+from qibolab.instruments.dummy import DummyInstrument, DummyLocalOscillator
 from qibolab.platform import Platform
 from qibolab.serialize import load_qubits, load_runcard, load_settings
 
 
 def remove_couplers(runcard):
-    """Remove coupler sections from runcard to create a dummy platform without couplers."""
+    """Remove coupler sections from runcard to create a dummy platform without
+    couplers."""
     runcard["topology"] = list(runcard["topology"].values())
     del runcard["couplers"]
     del runcard["native_gates"]["coupler"]
@@ -31,7 +31,7 @@ def create_dummy(with_couplers: bool = True):
     instrument = DummyInstrument("dummy", 0)
 
     # Create local oscillator
-    twpa_pump = LocalOscillator(name="twpa_pump", address=0)
+    twpa_pump = DummyLocalOscillator(name="twpa_pump", address=0)
     twpa_pump.frequency = 1e9
     twpa_pump.power = 10
 
@@ -42,13 +42,18 @@ def create_dummy(with_couplers: bool = True):
     # Create channel objects
     nqubits = runcard["nqubits"]
     channels = ChannelMap()
-    channels |= Channel("readout", port=instrument["readout"])
-    channels |= (Channel(f"drive-{i}", port=instrument[f"drive-{i}"]) for i in range(nqubits))
-    channels |= (Channel(f"flux-{i}", port=instrument[f"flux-{i}"]) for i in range(nqubits))
+    channels |= Channel("readout", port=instrument.ports("readout"))
+    channels |= (
+        Channel(f"drive-{i}", port=instrument.ports(f"drive-{i}"))
+        for i in range(nqubits)
+    )
+    channels |= (
+        Channel(f"flux-{i}", port=instrument.ports(f"flux-{i}")) for i in range(nqubits)
+    )
     channels |= Channel("twpa", port=None)
     if with_couplers:
         channels |= (
-            Channel(f"flux_coupler-{c}", port=instrument[f"flux_coupler-{c}"])
+            Channel(f"flux_coupler-{c}", port=instrument.ports(f"flux_coupler-{c}"))
             for c in itertools.chain(range(0, 2), range(3, 5))
         )
     channels["readout"].attenuation = 0
@@ -70,7 +75,13 @@ def create_dummy(with_couplers: bool = True):
             coupler.flux = channels[f"flux_coupler-{c}"]
 
     instruments = {instrument.name: instrument, twpa_pump.name: twpa_pump}
-    instrument.sampling_rate = settings.sampling_rate * 1e-9
-
     name = "dummy_couplers" if with_couplers else "dummy"
-    return Platform(name, qubits, pairs, instruments, settings, resonator_type="2D", couplers=couplers)
+    return Platform(
+        name,
+        qubits,
+        pairs,
+        instruments,
+        settings,
+        resonator_type="2D",
+        couplers=couplers,
+    )

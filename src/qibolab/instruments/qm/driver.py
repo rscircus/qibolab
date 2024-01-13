@@ -8,7 +8,7 @@ from qm.QuantumMachinesManager import QuantumMachinesManager
 from qibolab import AveragingMode
 from qibolab.instruments.abstract import Controller
 
-from .config import IQPortId, QMConfig, QMPort
+from .config import SAMPLING_RATE, IQPortId, QMConfig, QMPort
 from .sequence import Sequence
 from .sweepers import sweep
 
@@ -48,12 +48,18 @@ class QMOPX(Controller):
     _ports: Dict[IQPortId, QMPort] = field(default_factory=dict)
     """Dictionary holding the ports of controllers that are connected."""
     script_file_name: Optional[str] = "qua_script.txt"
-    """Name of the file that the QUA program will dumped in that after every execution.
+    """Name of the file that the QUA program will dumped in that after every
+    execution.
+
     If ``None`` the program will not be dumped.
     """
 
     def __post_init__(self):
         super().__init__(self.name, self.address)
+
+    @property
+    def sampling_rate(self):
+        return SAMPLING_RATE
 
     def connect(self):
         """Connect to the QM manager."""
@@ -62,23 +68,11 @@ class QMOPX(Controller):
 
     def setup(self):
         """Deprecated method."""
-        # controllers are defined when registering pulses
-        pass
-
-    def start(self):
-        # TODO: Start the OPX flux offsets?
-        pass
-
-    def stop(self):
-        """Close all running Quantum Machines."""
-        # TODO: Use logging
-        # log.warn("Closing all Quantum Machines.")
-        print("Closing all Quantum Machines.")
-        self.manager.close_all_quantum_machines()
 
     def disconnect(self):
         """Disconnect from QM manager."""
         if self.is_connected:
+            self.manager.close_all_quantum_machines()
             self.manager.close()
             self.is_connected = False
 
@@ -109,7 +103,9 @@ class QMOPX(Controller):
         results = {}
         for qmpulse in ro_pulses:
             pulse = qmpulse.pulse
-            results[pulse.qubit] = results[pulse.serial] = qmpulse.acquisition.fetch(handles)
+            results[pulse.qubit] = results[pulse.serial] = qmpulse.acquisition.fetch(
+                handles
+            )
         return results
 
     def play(self, qubits, couplers, sequence, options):
@@ -129,7 +125,9 @@ class QMOPX(Controller):
             if qubit.flux:
                 self.config.register_flux_element(qubit)
 
-        qmsequence = Sequence.create(qubits, sequence, sweepers, self.config, self.time_of_flight, self.smearing)
+        qmsequence = Sequence.create(
+            qubits, sequence, sweepers, self.config, self.time_of_flight, self.smearing
+        )
         # play pulses using QUA
         with qua.program() as experiment:
             n = declare(int)
@@ -139,7 +137,13 @@ class QMOPX(Controller):
                 qmpulse.declare_output(options, threshold, iq_angle)
 
             with for_(n, 0, n < options.nshots, n + 1):
-                sweep(list(sweepers), qubits, qmsequence, options.relaxation_time, self.config)
+                sweep(
+                    list(sweepers),
+                    qubits,
+                    qmsequence,
+                    options.relaxation_time,
+                    self.config,
+                )
 
             with qua.stream_processing():
                 for qmpulse in qmsequence.ro_pulses:

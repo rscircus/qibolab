@@ -1,16 +1,22 @@
-import tempfile
 from abc import ABC, abstractmethod
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from typing import Optional
 
 from qibolab.instruments.port import Port
 
 InstrumentId = str
-INSTRUMENTS_DATA_FOLDER = Path.home() / ".qibolab" / "instruments" / "data"
 
 
+@dataclass
 class InstrumentSettings:
     """Container of settings that are dumped in the platform runcard yaml."""
+
+    def dump(self):
+        """Dictionary containing the settings.
+
+        Useful when dumping the instruments to the runcard YAML.
+        """
+        return asdict(self)
 
 
 class Instrument(ABC):
@@ -25,39 +31,23 @@ class Instrument(ABC):
         self.name: InstrumentId = name
         self.address: str = address
         self.is_connected: bool = False
-        self.signature: str = f"{type(self).__name__}@{address}"
         self.settings: Optional[InstrumentSettings] = None
-        # create local storage folder
-        instruments_data_folder = INSTRUMENTS_DATA_FOLDER
-        instruments_data_folder.mkdir(parents=True, exist_ok=True)
-        # create temporary directory
-        self.tmp_folder = tempfile.TemporaryDirectory(dir=instruments_data_folder)
-        self.data_folder = Path(self.tmp_folder.name)
+
+    @property
+    def signature(self):
+        return f"{type(self).__name__}@{self.address}"
 
     @abstractmethod
     def connect(self):
         """Establish connection to the physical instrument."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def setup(self, *args, **kwargs):
-        """Upload settings to the physical instrument."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def start(self):
-        """Turn on the physical instrument."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def stop(self):
-        """Turn off the physical instrument."""
-        raise NotImplementedError
 
     @abstractmethod
     def disconnect(self):
         """Close connection to the physical instrument."""
-        raise NotImplementedError
+
+    @abstractmethod
+    def setup(self, *args, **kwargs):
+        """Set instrument settings."""
 
 
 class Controller(Instrument):
@@ -70,10 +60,13 @@ class Controller(Instrument):
         super().__init__(name, address)
         self._ports = {}
 
-    def __getitem__(self, port_name):
-        return self.ports(port_name)
+    @property
+    @abstractmethod
+    def sampling_rate(self):
+        """Sampling rate of control electronics in giga samples per second
+        (GSps)."""
 
-    def ports(self, port_name):
+    def ports(self, port_name, *args, **kwargs):
         """Get ports associated to this controller.
 
         Args:
@@ -98,7 +91,8 @@ class Controller(Instrument):
         """
 
     def split_batches(self, sequences):  # pragma: no cover
-        """Split sequences to batches each of which can be unrolled and played as a single sequence.
+        """Split sequences to batches each of which can be unrolled and played
+        as a single sequence.
 
         Args:
             sequence (list): List of :class:`qibolab.pulses.PulseSequence` to be played.
@@ -108,7 +102,8 @@ class Controller(Instrument):
             Default will return all sequences as a single batch.
         """
         raise RuntimeError(
-            f"Instrument of type {type(self)} does not support " "batch splitting for sequence unrolling."
+            f"Instrument of type {type(self)} does not support "
+            "batch splitting for sequence unrolling."
         )
 
     @abstractmethod

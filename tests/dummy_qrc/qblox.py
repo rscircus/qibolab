@@ -1,11 +1,6 @@
 import pathlib
 
 from qibolab.channels import Channel, ChannelMap
-from qibolab.instruments.qblox.cluster import (
-    Cluster,
-    Cluster_Settings,
-    ReferenceClockSource,
-)
 from qibolab.instruments.qblox.cluster_qcm_bb import ClusterQCM_BB
 from qibolab.instruments.qblox.cluster_qcm_rf import ClusterQCM_RF
 from qibolab.instruments.qblox.cluster_qrm_rf import ClusterQRM_RF
@@ -35,12 +30,6 @@ def create(runcard_path=RUNCARD):
     runcard = load_runcard(runcard_path)
     modules = {}
 
-    cluster = Cluster(
-        name="cluster",
-        address=ADDRESS,
-        settings=Cluster_Settings(reference_clock_source=ReferenceClockSource.INTERNAL),
-    )
-
     # DEBUG: debug folder = report folder
     # import os
     # folder = os.path.dirname(runcard) + "/debug/"
@@ -50,16 +39,16 @@ def create(runcard_path=RUNCARD):
     #     modules[name]._debug_folder = folder
 
     modules = {
-        "qcm_bb0": ClusterQCM_BB("qcm_bb0", f"{ADDRESS}:2", cluster),
-        "qcm_bb1": ClusterQCM_BB("qcm_bb1", f"{ADDRESS}:4", cluster),
-        "qcm_rf0": ClusterQCM_RF("qcm_rf0", f"{ADDRESS}:6", cluster),
-        "qcm_rf1": ClusterQCM_RF("qcm_rf1", f"{ADDRESS}:8", cluster),
-        "qcm_rf2": ClusterQCM_RF("qcm_rf2", f"{ADDRESS}:10", cluster),
-        "qrm_rf_a": ClusterQRM_RF("qrm_rf_a", f"{ADDRESS}:16", cluster),
-        "qrm_rf_b": ClusterQRM_RF("qrm_rf_b", f"{ADDRESS}:18", cluster),
+        "qcm_bb0": ClusterQCM_BB("qcm_bb0", f"{ADDRESS}:2"),
+        "qcm_bb1": ClusterQCM_BB("qcm_bb1", f"{ADDRESS}:4"),
+        "qcm_rf0": ClusterQCM_RF("qcm_rf0", f"{ADDRESS}:6"),
+        "qcm_rf1": ClusterQCM_RF("qcm_rf1", f"{ADDRESS}:8"),
+        "qcm_rf2": ClusterQCM_RF("qcm_rf2", f"{ADDRESS}:10"),
+        "qrm_rf_a": ClusterQRM_RF("qrm_rf_a", f"{ADDRESS}:16"),
+        "qrm_rf_b": ClusterQRM_RF("qrm_rf_b", f"{ADDRESS}:18"),
     }
 
-    controller = QbloxController("qblox_controller", cluster, modules)
+    controller = QbloxController("qblox_controller", ADDRESS, modules)
     twpa_pump = SGS100A(name="twpa_pump", address="192.168.0.36")
 
     instruments = {
@@ -72,23 +61,23 @@ def create(runcard_path=RUNCARD):
     # Create channel objects
     channels = ChannelMap()
     # Readout
-    channels |= Channel(name="L3-25_a", port=modules["qrm_rf_a"].ports["o1"])
-    channels |= Channel(name="L3-25_b", port=modules["qrm_rf_b"].ports["o1"])
+    channels |= Channel(name="L3-25_a", port=modules["qrm_rf_a"].ports("o1"))
+    channels |= Channel(name="L3-25_b", port=modules["qrm_rf_b"].ports("o1"))
     # Feedback
-    channels |= Channel(name="L2-5_a", port=modules["qrm_rf_a"].ports["i1"])
-    channels |= Channel(name="L2-5_b", port=modules["qrm_rf_b"].ports["i1"])
+    channels |= Channel(name="L2-5_a", port=modules["qrm_rf_a"].ports("i1", out=False))
+    channels |= Channel(name="L2-5_b", port=modules["qrm_rf_b"].ports("i1", out=False))
     # Drive
-    channels |= Channel(name="L3-15", port=modules["qcm_rf0"].ports["o1"])
-    channels |= Channel(name="L3-11", port=modules["qcm_rf0"].ports["o2"])
-    channels |= Channel(name="L3-12", port=modules["qcm_rf1"].ports["o1"])
-    channels |= Channel(name="L3-13", port=modules["qcm_rf1"].ports["o2"])
-    channels |= Channel(name="L3-14", port=modules["qcm_rf2"].ports["o1"])
+    channels |= Channel(name="L3-15", port=modules["qcm_rf0"].ports("o1"))
+    channels |= Channel(name="L3-11", port=modules["qcm_rf0"].ports("o2"))
+    channels |= Channel(name="L3-12", port=modules["qcm_rf1"].ports("o1"))
+    channels |= Channel(name="L3-13", port=modules["qcm_rf1"].ports("o2"))
+    channels |= Channel(name="L3-14", port=modules["qcm_rf2"].ports("o1"))
     # Flux
-    channels |= Channel(name="L4-5", port=modules["qcm_bb0"].ports["o1"])
-    channels |= Channel(name="L4-1", port=modules["qcm_bb0"].ports["o2"])
-    channels |= Channel(name="L4-2", port=modules["qcm_bb0"].ports["o3"])
-    channels |= Channel(name="L4-3", port=modules["qcm_bb0"].ports["o4"])
-    channels |= Channel(name="L4-4", port=modules["qcm_bb1"].ports["o1"])
+    channels |= Channel(name="L4-5", port=modules["qcm_bb0"].ports("o1"))
+    channels |= Channel(name="L4-1", port=modules["qcm_bb0"].ports("o2"))
+    channels |= Channel(name="L4-2", port=modules["qcm_bb0"].ports("o3"))
+    channels |= Channel(name="L4-3", port=modules["qcm_bb0"].ports("o4"))
+    channels |= Channel(name="L4-4", port=modules["qcm_bb1"].ports("o1"))
     # TWPA
     channels |= Channel(name="L3-28", port=None)
     channels["L3-28"].local_oscillator = twpa_pump

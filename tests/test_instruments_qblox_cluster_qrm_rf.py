@@ -2,13 +2,12 @@ import numpy as np
 import pytest
 
 from qibolab.instruments.abstract import Instrument
-from qibolab.instruments.qblox.cluster import Cluster
 from qibolab.instruments.qblox.cluster_qrm_rf import ClusterQRM_RF
 from qibolab.instruments.qblox.port import QbloxInputPort, QbloxOutputPort
 from qibolab.pulses import DrivePulse, PulseSequence, ReadoutPulse
 from qibolab.sweeper import Parameter, Sweeper, SweeperType
 
-from .qblox_fixtures import cluster, connected_cluster, connected_controller, controller
+from .qblox_fixtures import connected_controller, controller
 
 OUTPUT_CHANNEL = "L3-25_a"
 INPUT_CHANNEL = "L2-5_a"
@@ -16,39 +15,40 @@ ATTENUATION = 38
 LO_FREQUENCY = 7_000_000_000
 TIME_OF_FLIGHT = 500
 ACQUISITION_DURATION = 900
+SETTINGS = {
+    "o1": {
+        "attenuation": ATTENUATION,
+        "lo_frequency": LO_FREQUENCY,
+    },
+    "i1": {
+        "acquisition_hold_off": TIME_OF_FLIGHT,
+        "acquisition_duration": ACQUISITION_DURATION,
+    },
+}
 
 
-def get_qrm_rf(controller, cluster):
+def get_qrm_rf(controller):
     for module in controller.modules.values():
         if isinstance(module, ClusterQRM_RF):
-            return ClusterQRM_RF(module.name, module.address, cluster)
-    pytest.skip(f"Skipping qblox ClusterQRM_RF test for {cluster.name}.")
+            return ClusterQRM_RF(module.name, module.address)
 
 
 @pytest.fixture(scope="module")
-def qrm_rf(controller, cluster):
-    return get_qrm_rf(controller, cluster)
+def qrm_rf(controller):
+    return get_qrm_rf(controller)
 
 
 @pytest.fixture(scope="module")
-def connected_qrm_rf(connected_controller, connected_cluster):
-    settings = {
-        "o1": {
-            "attenuation": ATTENUATION,
-            "lo_frequency": LO_FREQUENCY,
-        },
-        "i1": {
-            "acquisition_hold_off": TIME_OF_FLIGHT,
-            "acquisition_duration": ACQUISITION_DURATION,
-        },
-    }
-    qrm_rf = get_qrm_rf(connected_controller, connected_cluster)
-    qrm_rf.setup(**settings)
-    qrm_rf.connect()
+def connected_qrm_rf(connected_controller):
+    qrm_rf = get_qrm_rf(connected_controller)
+    qrm_rf.setup(**SETTINGS)
+    qrm_rf.ports("o1")
+    qrm_rf.ports("i1", out=False)
+    qrm_rf.connect(connected_controller.cluster)
 
     yield qrm_rf
     qrm_rf.disconnect()
-    connected_cluster.disconnect()
+    connected_controller.disconnect()
 
 
 def test_instrument_interface(qrm_rf: ClusterQRM_RF):
@@ -56,35 +56,21 @@ def test_instrument_interface(qrm_rf: ClusterQRM_RF):
     for abstract_method in Instrument.__abstractmethods__:
         assert hasattr(qrm_rf, abstract_method)
 
-    for attribute in ["name", "address", "is_connected", "signature", "tmp_folder", "data_folder"]:
+    for attribute in [
+        "name",
+        "address",
+        "is_connected",
+    ]:
         assert hasattr(qrm_rf, attribute)
 
 
 def test_init(qrm_rf: ClusterQRM_RF):
-    assert type(qrm_rf._cluster) == Cluster
     assert qrm_rf.device == None
 
 
 def test_setup(qrm_rf: ClusterQRM_RF):
-    settings = {
-        "o1": {
-            "attenuation": ATTENUATION,
-            "lo_frequency": LO_FREQUENCY,
-        },
-        "i1": {
-            "acquisition_hold_off": TIME_OF_FLIGHT,
-            "acquisition_duration": ACQUISITION_DURATION,
-        },
-    }
-    qrm_rf.setup(**settings)
-    assert type(qrm_rf.ports["o1"]) == QbloxOutputPort
-    assert type(qrm_rf.ports["i1"]) == QbloxInputPort
-    assert qrm_rf.settings == settings
-    output_port: QbloxOutputPort = qrm_rf.ports["o1"]
-    assert output_port.sequencer_number == 0
-    input_port: QbloxInputPort = qrm_rf.ports["i1"]
-    assert input_port.input_sequencer_number == 0
-    assert input_port.output_sequencer_number == 0
+    qrm_rf.setup(**SETTINGS)
+    assert qrm_rf.settings == SETTINGS
 
 
 @pytest.mark.qpu
@@ -99,7 +85,10 @@ def test_connect(connected_qrm_rf: ClusterQRM_RF):
     assert qrm_rf.device.get("out0_offset_path1") == 0
     assert qrm_rf.device.get("scope_acq_avg_mode_en_path0") == True
     assert qrm_rf.device.get("scope_acq_avg_mode_en_path1") == True
-    assert qrm_rf.device.get("scope_acq_sequencer_select") == qrm_rf.DEFAULT_SEQUENCERS["i1"]
+    assert (
+        qrm_rf.device.get("scope_acq_sequencer_select")
+        == qrm_rf.DEFAULT_SEQUENCERS["i1"]
+    )
     assert qrm_rf.device.get("scope_acq_trigger_level_path0") == 0
     assert qrm_rf.device.get("scope_acq_trigger_level_path1") == 0
     assert qrm_rf.device.get("scope_acq_trigger_mode_path0") == "sequencer"
@@ -136,13 +125,20 @@ def test_connect(connected_qrm_rf: ClusterQRM_RF):
 
     assert default_sequencer.get("mod_en_awg") == True
 
-    assert qrm_rf.ports["o1"].nco_freq == 0
-    assert qrm_rf.ports["o1"].nco_phase_offs == 0
+    assert qrm_rf._ports["o1"].nco_freq == 0
+    assert qrm_rf._ports["o1"].nco_phase_offs == 0
 
     assert default_sequencer.get("demod_en_acq") == True
 
-    assert qrm_rf.ports["i1"].acquisition_hold_off == TIME_OF_FLIGHT
-    assert qrm_rf.ports["i1"].acquisition_duration == ACQUISITION_DURATION
+    assert qrm_rf._ports["i1"].acquisition_hold_off == TIME_OF_FLIGHT
+    assert qrm_rf._ports["i1"].acquisition_duration == ACQUISITION_DURATION
+    assert type(qrm_rf._ports["o1"]) == QbloxOutputPort
+    assert type(qrm_rf._ports["i1"]) == QbloxInputPort
+    output_port: QbloxOutputPort = qrm_rf._ports["o1"]
+    assert output_port.sequencer_number == 0
+    input_port: QbloxInputPort = qrm_rf._ports["i1"]
+    assert input_port.input_sequencer_number == 0
+    assert input_port.output_sequencer_number == 0
 
 
 @pytest.mark.qpu
@@ -150,15 +146,23 @@ def test_pulse_sequence(connected_platform, connected_qrm_rf: ClusterQRM_RF):
     ps = PulseSequence()
     for channel in connected_qrm_rf.channel_map:
         ps.add(DrivePulse(0, 200, 1, 6.8e9, np.pi / 2, "Gaussian(5)", channel))
-        ps.add(ReadoutPulse(200, 2000, 1, 7.1e9, np.pi / 2, "Rectangular()", channel, qubit=0))
-        ps.add(ReadoutPulse(200, 2000, 1, 7.2e9, np.pi / 2, "Rectangular()", channel, qubit=1))
+        ps.add(
+            ReadoutPulse(
+                200, 2000, 1, 7.1e9, np.pi / 2, "Rectangular()", channel, qubit=0
+            )
+        )
+        ps.add(
+            ReadoutPulse(
+                200, 2000, 1, 7.2e9, np.pi / 2, "Rectangular()", channel, qubit=1
+            )
+        )
     qubits = connected_platform.qubits
-    connected_qrm_rf.ports["i1"].hardware_demod_en = True
+    connected_qrm_rf._ports["i1"].hardware_demod_en = True
     connected_qrm_rf.process_pulse_sequence(qubits, ps, 1000, 1, 10000)
     connected_qrm_rf.upload()
     connected_qrm_rf.play_sequence()
     results = connected_qrm_rf.acquire()
-    connected_qrm_rf.ports["i1"].hardware_demod_en = False
+    connected_qrm_rf._ports["i1"].hardware_demod_en = False
     connected_qrm_rf.process_pulse_sequence(qubits, ps, 1000, 1, 10000)
     connected_qrm_rf.upload()
     connected_qrm_rf.play_sequence()
@@ -171,9 +175,15 @@ def test_sweepers(connected_platform, connected_qrm_rf: ClusterQRM_RF):
     qd_pulses = {}
     ro_pulses = {}
     for channel in connected_qrm_rf.channel_map:
-        qd_pulses[0] = DrivePulse(0, 200, 1, 7e9, np.pi / 2, "Gaussian(5)", channel, qubit=0)
-        ro_pulses[0] = ReadoutPulse(200, 2000, 1, 7.1e9, np.pi / 2, "Rectangular()", channel, qubit=0)
-        ro_pulses[1] = ReadoutPulse(200, 2000, 1, 7.2e9, np.pi / 2, "Rectangular()", channel, qubit=1)
+        qd_pulses[0] = DrivePulse(
+            0, 200, 1, 7e9, np.pi / 2, "Gaussian(5)", channel, qubit=0
+        )
+        ro_pulses[0] = ReadoutPulse(
+            200, 2000, 1, 7.1e9, np.pi / 2, "Rectangular()", channel, qubit=0
+        )
+        ro_pulses[1] = ReadoutPulse(
+            200, 2000, 1, 7.2e9, np.pi / 2, "Rectangular()", channel, qubit=1
+        )
         ps.add(qd_pulses[0], ro_pulses[0], ro_pulses[1])
 
     qubits = connected_platform.qubits
@@ -189,7 +199,9 @@ def test_sweepers(connected_platform, connected_qrm_rf: ClusterQRM_RF):
         type=SweeperType.OFFSET,
     )
 
-    connected_qrm_rf.process_pulse_sequence(qubits, ps, 1000, 1, 10000, sweepers=[sweeper])
+    connected_qrm_rf.process_pulse_sequence(
+        qubits, ps, 1000, 1, 10000, sweepers=[sweeper]
+    )
     connected_qrm_rf.upload()
     connected_qrm_rf.play_sequence()
     results = connected_qrm_rf.acquire()
@@ -202,7 +214,9 @@ def test_sweepers(connected_platform, connected_qrm_rf: ClusterQRM_RF):
         type=SweeperType.ABSOLUTE,
     )
 
-    connected_qrm_rf.process_pulse_sequence(qubits, ps, 1000, 1, 10000, sweepers=[sweeper])
+    connected_qrm_rf.process_pulse_sequence(
+        qubits, ps, 1000, 1, 10000, sweepers=[sweeper]
+    )
     connected_qrm_rf.upload()
     connected_qrm_rf.play_sequence()
     results = connected_qrm_rf.acquire()

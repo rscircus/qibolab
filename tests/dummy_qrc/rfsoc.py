@@ -21,14 +21,14 @@ def create(runcard_path=RUNCARD):
     Used in ``test_instruments_rfsoc.py``.
     """
     # Instantiate QICK instruments
-    controller = RFSoC("tii_rfsoc4x2", "0.0.0.0", 0)
+    controller = RFSoC("tii_rfsoc4x2", "0.0.0.0", 0, sampling_rate=9.8304)
 
     # Create channel objects and map to instrument controllers
     channels = ChannelMap()
-    channels |= Channel("L3-18_ro", port=controller[0])  # readout (DAC)
-    channels |= Channel("L2-RO", port=controller[0])  # feedback (readout DAC)
-    channels |= Channel("L3-18_qd", port=controller[1])  # drive
-    channels |= Channel("L2-22_qf", port=controller[2])  # flux
+    channels |= Channel("L3-18_ro", port=controller.ports(0))  # readout (DAC)
+    channels |= Channel("L2-RO", port=controller.ports(0))  # feedback (readout DAC)
+    channels |= Channel("L3-18_qd", port=controller.ports(1))  # drive
+    channels |= Channel("L2-22_qf", port=controller.ports(2))  # flux
 
     lo_twpa = SGS100A("twpa_a", "192.168.0.32")
     lo_era = ERA("ErasynthLO", "192.168.0.212", ethernet=True)
