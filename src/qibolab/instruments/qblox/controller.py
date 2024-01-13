@@ -346,22 +346,17 @@ class QbloxController(Controller):
                     initial = {}
                     for pulse in sweeper.pulses:
                         if pulse.type == PulseType.READOUT:
-                            initial[pulse.id] = qubits[pulse.qubit].readout.lo_frequency
-                            if sweeper.type == SweeperType.ABSOLUTE:
-                                qubits[pulse.qubit].readout.lo_frequency = value
-                            elif sweeper.type == SweeperType.OFFSET:
-                                qubits[pulse.qubit].readout.lo_frequency = initial[pulse.id] + value
-                            elif sweeper.type == SweeperType.FACTOR:
-                                qubits[pulse.qubit].readout.lo_frequency = initial[pulse.id] * value
-
+                            channel_to_sweep = qubits[pulse.qubit].readout
                         elif pulse.type == PulseType.DRIVE:
-                            initial[pulse.id] = qubits[pulse.qubit].drive.lo_frequency
-                            if sweeper.type == SweeperType.ABSOLUTE:
-                                qubits[pulse.qubit].drive.lo_frequency = value
-                            elif sweeper.type == SweeperType.OFFSET:
-                                qubits[pulse.qubit].drive.lo_frequency = initial[pulse.id] + value
-                            elif sweeper.type == SweeperType.FACTOR:
-                                qubits[pulse.qubit].drive.lo_frequency = initial[pulse.id] * value
+                            channel_to_sweep = qubits[pulse.qubit].drive
+
+                        initial[pulse.id] = channel_to_sweep.lo_frequency
+                        if sweeper.type == SweeperType.ABSOLUTE:
+                            channel_to_sweep.lo_frequency = value
+                        elif sweeper.type == SweeperType.OFFSET:
+                            channel_to_sweep.lo_frequency = initial[pulse.id] + value
+                        elif sweeper.type == SweeperType.FACTOR:
+                            channel_to_sweep.lo_frequency = initial[pulse.id] * value
 
                 if len(sweepers) > 1:
                     self._sweep_recursion(
