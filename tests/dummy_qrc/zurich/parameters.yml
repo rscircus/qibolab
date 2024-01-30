@@ -26,7 +26,6 @@ native_gates:
                 # shape: Gaussian(5)
                 shape: Drag(5, 0.04)
                 type: qd # qubit drive
-                relative_start: 0
                 phase: 0
             RX12:
                 duration: 40
@@ -35,7 +34,6 @@ native_gates:
                 # shape: Gaussian(5)
                 shape: Drag(5, 0.04)
                 type: qd # qubit drive
-                relative_start: 0
                 phase: 0
             MZ:
                 duration: 2000 #2000.e-9
@@ -43,7 +41,6 @@ native_gates:
                 frequency: 5_229_200_000 #5_233_200_000 #doesnt do anything requiered for qibolab to work
                 shape: Rectangular()
                 type: ro # readout
-                relative_start: 0
                 phase: 0
 
         1: # qubit number
@@ -161,35 +158,31 @@ native_gates:
     coupler:
         0:
             CP:
-                type: coupler
+                type: cf
                 duration: 1000
                 amplitude: .5
                 shape: Rectangular()
-                coupler: 0
                 relative_start: 0
         1:
             CP:
-                type: coupler
+                type: cf
                 duration: 1000
                 amplitude: .5
                 shape: Rectangular()
-                coupler: 1
                 relative_start: 0
         3:
             CP:
-                type: coupler
+                type: cf
                 duration: 1000
                 amplitude: .5
                 shape: Rectangular()
-                coupler: 3
                 relative_start: 0
         4:
             CP:
-                type: coupler
+                type: cf
                 duration: 1000
                 amplitude: .5
                 shape: Rectangular()
-                coupler: 4
                 relative_start: 0
 
     two_qubit:
