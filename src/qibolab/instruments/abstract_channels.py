@@ -13,16 +13,13 @@ TODO: this needs proper design
 class IQChannel(ABC):
 
     @abstractmethod
-    def foo(self, args, kwargs):
-        ...
+    def foo(self, args, kwargs): ...
 
     @abstractmethod
-    def bar(self, args):
-        ...
+    def bar(self, args): ...
 
 
 class DCChannel(ABC):
 
     @abstractmethod
-    def baz(self, kwargs):
-        ...
+    def baz(self, kwargs): ...
