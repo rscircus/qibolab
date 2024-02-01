@@ -4,12 +4,11 @@ The format of runcards in the ``qiboteam/qibolab_platforms_qrc``
 repository is assumed here. See :ref:`Using runcards <using_runcards>`
 example for more details.
 """
+
 from collections import defaultdict
 from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Tuple
-
-import yaml
 
 from qibolab.couplers import Coupler
 from qibolab.kernels import Kernels
@@ -25,13 +24,13 @@ from qibolab.platform import (
 from qibolab.pulses import Delay, Pulse, PulseSequence, PulseType
 from qibolab.qubits import Qubit, QubitPair
 
-RUNCARD = "parameters.yml"
+RUNCARD = "parameters.json"
 PLATFORM = "platform.py"
 
 
 def load_runcard(path: Path) -> dict:
-    """Load runcard YAML to a dictionary."""
-    return yaml.safe_load((path / RUNCARD).read_text())
+    """Load runcard JSON to a dictionary."""
+    return json.loads((path / RUNCARD).read_text())
 
 
 def load_settings(runcard: dict) -> Settings:
@@ -51,10 +50,9 @@ def load_qubits(
     objects.
     """
     qubits = {
-        q: Qubit(q, **char)
+        json.loads(q): Qubit(json.loads(q), **char)
         for q, char in runcard["characterization"]["single_qubit"].items()
     }
-
     if kernels is not None:
         for q in kernels:
             qubits[q].kernel = kernels[q]
@@ -63,14 +61,14 @@ def load_qubits(
     pairs = {}
     if "coupler" in runcard["characterization"]:
         couplers = {
-            c: Coupler(c, **char)
+            json.loads(c): Coupler(json.loads(c), **char)
             for c, char in runcard["characterization"]["coupler"].items()
         }
 
         for c, pair in runcard["topology"].items():
             q0, q1 = pair
             pairs[(q0, q1)] = pairs[(q1, q0)] = QubitPair(
-                qubits[q0], qubits[q1], couplers[c]
+                qubits[q0], qubits[q1], couplers[json.loads(c)]
             )
     else:
         for pair in runcard["topology"]:
@@ -234,12 +232,14 @@ def dump_characterization(qubits: QubitMap, couplers: CouplerMap = None) -> dict
     """Dump qubit characterization section to dictionary following the runcard
     format, using qubit and pair objects."""
     characterization = {
-        "single_qubit": {q: qubit.characterization for q, qubit in qubits.items()},
+        "single_qubit": {
+            json.dumps(q): qubit.characterization for q, qubit in qubits.items()
+        },
     }
 
     if couplers:
         characterization["coupler"] = {
-            c.name: {"sweetspot": c.sweetspot} for c in couplers.values()
+            json.dumps(c.name): {"sweetspot": c.sweetspot} for c in couplers.values()
         }
     return characterization
 
@@ -260,13 +260,13 @@ def dump_instruments(instruments: InstrumentMap) -> dict:
 
 
 def dump_runcard(platform: Platform, path: Path):
-    """Serializes the platform and saves it as a yaml runcard file.
+    """Serializes the platform and saves it as a json runcard file.
 
     The file saved follows the format explained in :ref:`Using runcards <using_runcards>`.
 
     Args:
         platform (qibolab.platform.Platform): The platform to be serialized.
-        path (pathlib.Path): Path that the yaml file will be saved.
+        path (pathlib.Path): Path that the json file will be saved.
     """
 
     settings = {
@@ -291,9 +291,7 @@ def dump_runcard(platform: Platform, path: Path):
         platform.qubits, platform.couplers
     )
 
-    (path / RUNCARD).write_text(
-        yaml.dump(settings, sort_keys=False, indent=4, default_flow_style=None)
-    )
+    (path / RUNCARD).write_text(json.dumps(settings, sort_keys=False, indent=4))
 
 
 def dump_kernels(platform: Platform, path: Path):
@@ -316,11 +314,11 @@ def dump_kernels(platform: Platform, path: Path):
 
 
 def dump_platform(platform: Platform, path: Path):
-    """Platform serialization as runcard (yaml) and kernels (npz).
+    """Platform serialization as runcard (json) and kernels (npz).
 
     Args:
         platform (qibolab.platform.Platform): The platform to be serialized.
-        path (pathlib.Path): Path where yaml and npz will be dumped.
+        path (pathlib.Path): Path where json and npz will be dumped.
     """
 
     dump_kernels(platform=platform, path=path)
