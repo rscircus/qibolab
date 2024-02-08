@@ -22,7 +22,6 @@ from qibolab.pulses import CouplerFluxPulse, FluxPulse, PulseSequence, PulseType
 from qibolab.qubits import Qubit
 from qibolab.sweeper import Parameter, Sweeper
 
-
 SAMPLING_RATE = 2
 NANO_TO_SECONDS = 1e-9
 COMPILER_SETTINGS = {
@@ -203,8 +202,7 @@ class ZhSweeper:
 
 class ZhSweeperLine:
     """Zurich sweeper from qibolab sweeper for non pulse parameters Bias, Delay
-    (, power_range, local_oscillator frequency, offset ???)
-    """
+    (, power_range, local_oscillator frequency, offset ???)"""
 
     def __init__(self, sweeper, qubit=None, sequence=None, pulse=None):
         self.sweeper = sweeper
@@ -270,9 +268,7 @@ class Zurich(Controller):
 
     PortType = ZhPort
 
-    def __init__(
-        self, name, device_setup, time_of_flight=0.0, smearing=0.0
-    ):
+    def __init__(self, name, device_setup, time_of_flight=0.0, smearing=0.0):
         super().__init__(name, None)
 
         self.signal_map = {}
