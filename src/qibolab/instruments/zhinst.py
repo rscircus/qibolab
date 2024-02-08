@@ -1,12 +1,10 @@
 """Instrument for using the Zurich Instruments (Zhinst) devices."""
 
 import copy
-import os
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from typing import Dict, List, Tuple, Union
 
-import laboneq._token
 import laboneq.simple as lo
 import numpy as np
 from laboneq.dsl.experiment.pulse_library import (
@@ -24,9 +22,6 @@ from qibolab.pulses import CouplerFluxPulse, FluxPulse, PulseSequence, PulseType
 from qibolab.qubits import Qubit
 from qibolab.sweeper import Parameter, Sweeper
 
-# this env var just needs to be set
-os.environ["LABONEQ_TOKEN"] = "not required"
-laboneq._token.is_valid_token = lambda _token: True  # pylint: disable=W0212
 
 SAMPLING_RATE = 2
 NANO_TO_SECONDS = 1e-9
