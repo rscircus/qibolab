@@ -1,4 +1,5 @@
 """Qblox Cluster QCM-RF driver."""
+
 import copy
 import json
 
@@ -365,9 +366,10 @@ class QcmRf(ClusterModule):
                         )
 
                     # get next sequencer
+                    pulse_if = self.get_if(non_overlapping_pulses[0])
                     sequencer = self._get_next_sequencer(
                         port=port,
-                        frequency=self.get_if(non_overlapping_pulses[0]),
+                        frequency=pulse_if,
                         qubit=non_overlapping_pulses[0].qubit,
                     )
                     # add the sequencer to the list of sequencers required by the port
@@ -380,7 +382,10 @@ class QcmRf(ClusterModule):
                         # attempt to save the waveforms to the sequencer waveforms buffer
                         try:
                             sequencer.waveforms_buffer.add_waveforms(
-                                pulse, self._ports[port].hardware_mod_en, sweepers
+                                pulse,
+                                pulse_if,
+                                self._ports[port].hardware_mod_en,
+                                sweepers,
                             )
                             sequencer.pulses.append(pulse)
                             pulses_to_be_processed.remove(pulse)

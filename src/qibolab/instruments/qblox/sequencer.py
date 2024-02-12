@@ -36,7 +36,11 @@ class WaveformsBuffer:
         self.available_memory: int = WaveformsBuffer.SIZE
 
     def add_waveforms(
-        self, pulse: Pulse, hardware_mod_en: bool, sweepers: list[Sweeper]
+        self,
+        pulse: Pulse,
+        pulse_if: int,
+        hardware_mod_en: bool,
+        sweepers: list[Sweeper],
     ):
         """Adds a pair of i and q waveforms to the list of unique waveforms.
 
@@ -67,7 +71,9 @@ class WaveformsBuffer:
             if hardware_mod_en:
                 waveform_i, waveform_q = pulse_copy.envelope_waveforms(SAMPLING_RATE)
             else:
-                waveform_i, waveform_q = pulse_copy.modulated_waveforms(SAMPLING_RATE)
+                waveform_i, waveform_q = pulse_copy.shape.modulated_waveforms(
+                    pulse_if, SAMPLING_RATE
+                )
 
             pulse.waveform_i = waveform_i
             pulse.waveform_q = waveform_q

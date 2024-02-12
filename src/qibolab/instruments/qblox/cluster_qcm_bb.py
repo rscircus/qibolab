@@ -1,4 +1,5 @@
 """Qblox Cluster QCM driver."""
+
 import copy
 import json
 
@@ -340,9 +341,10 @@ class QcmBb(ClusterModule):
                             f"The number of sequencers requried to play the sequence exceeds the number available {self._device_num_sequencers}."
                         )
                     # get next sequencer
+                    pulse_if = self.get_if(non_overlapping_pulses[0])
                     sequencer = self._get_next_sequencer(
                         port=port,
-                        frequency=self.get_if(non_overlapping_pulses[0]),
+                        frequency=pulse_if,
                         qubits=qubits,
                     )
                     # add the sequencer to the list of sequencers required by the port
@@ -355,7 +357,10 @@ class QcmBb(ClusterModule):
                         # attempt to save the waveforms to the sequencer waveforms buffer
                         try:
                             sequencer.waveforms_buffer.add_waveforms(
-                                pulse, self._ports[port].hardware_mod_en, sweepers
+                                pulse,
+                                pulse_if,
+                                self._ports[port].hardware_mod_en,
+                                sweepers,
                             )
                             sequencer.pulses.append(pulse)
                             pulses_to_be_processed.remove(pulse)

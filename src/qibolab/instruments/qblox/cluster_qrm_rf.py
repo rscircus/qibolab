@@ -1,4 +1,5 @@
 """Qblox Cluster QRM-RF driver."""
+
 import copy
 import json
 import time
@@ -424,9 +425,10 @@ class QrmRf(ClusterModule):
                         f"The number of sequencers requried to play the sequence exceeds the number available {self._device_num_sequencers}."
                     )
                 # get next sequencer
+                pulse_if = self.get_if(non_overlapping_pulses[0])
                 sequencer = self._get_next_sequencer(
                     port=port,
-                    frequency=self.get_if(non_overlapping_pulses[0]),
+                    frequency=pulse_if,
                     qubits=qubits,
                     qubit=non_overlapping_pulses[0].qubit,
                 )
@@ -440,7 +442,7 @@ class QrmRf(ClusterModule):
                     # attempt to save the waveforms to the sequencer waveforms buffer
                     try:
                         sequencer.waveforms_buffer.add_waveforms(
-                            pulse, self._ports[port].hardware_mod_en, sweepers
+                            pulse, pulse_if, self._ports[port].hardware_mod_en, sweepers
                         )
                         sequencer.pulses.append(pulse)
                         pulses_to_be_processed.remove(pulse)
@@ -989,9 +991,9 @@ class QrmRf(ClusterModule):
                     if len(sequencer.pulses.ro_pulses) == 1:
                         pulse = sequencer.pulses.ro_pulses[0]
                         frequency = self.get_if(pulse)
-                        acquisitions[pulse.qubit] = acquisitions[
-                            pulse.id
-                        ] = AveragedAcquisition(scope, duration, frequency)
+                        acquisitions[pulse.qubit] = acquisitions[pulse.id] = (
+                            AveragedAcquisition(scope, duration, frequency)
+                        )
                     else:
                         raise RuntimeError(
                             "Software Demodulation only supports one acquisition per channel. "
@@ -1001,9 +1003,9 @@ class QrmRf(ClusterModule):
                     results = self.device.get_acquisitions(sequencer.number)
                     for pulse in sequencer.pulses.ro_pulses:
                         bins = results[pulse.id]["acquisition"]["bins"]
-                        acquisitions[pulse.qubit] = acquisitions[
-                            pulse.id
-                        ] = DemodulatedAcquisition(bins, duration)
+                        acquisitions[pulse.qubit] = acquisitions[pulse.id] = (
+                            DemodulatedAcquisition(bins, duration)
+                        )
 
                     # Provide Scope Data for verification (assuming memory reseet is being done)
                     if len(sequencer.pulses.ro_pulses) == 1:
